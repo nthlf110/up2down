@@ -151,3 +151,5 @@ if __name__ == '__main__':
                     DNA标签=DNA, RNA标签=RNA, 癌种=cancer, 样本类型=sample_type, 送检日期=get_date(delivery_date),
                     收样日期=get_date(receive_date), 最后出报告日期=get_date(deadline), 电子报告='',
                     备注1=note_1, 备注2=note_2, 备注3=note_3, 负责人=report))
+            info_to_xlsx(list(output_xlsx[0].keys()), [list(i.values()) for i in output_xlsx],
+                        options.output, 'Sheet1')

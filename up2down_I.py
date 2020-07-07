@@ -205,6 +205,8 @@ if __name__ == '__main__':
         sample_id = i['TS编号']
         if isinstance(sample_id, (int, float)):
             sample_id = query_ts_id(str(int(sample_id)), summary_xlsx)
+        elif isinstance(sample_id, str):
+            sample_id = query_ts_id(sample_id, summary_xlsx)
         patient_name = i['患者姓名'].split('-')[0]
         sample_name = i['样本名'].split('-')[0]
         test_panel = i['样本组成'] + i['文库名*'] + ',' + str(int(i['要求测序数据量（G）']))

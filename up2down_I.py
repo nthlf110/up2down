@@ -112,20 +112,54 @@ def info_to_xlsx(list_head_names, list_info, output_file_name, sheet_name):
     wb.save(output_file_name)
 
 
-def query_ts_id(ts_id, summary):
+def query_ts_id(ts_id, name, summary):
     for i in iter(summary):
-        if i['检测编号'].__contains__(ts_id):
+        if i['检测编号'].__contains__(ts_id) and i['患者姓名'].strip() == name:
             return i['检测编号']
     return ts_id + 'Not Found'
 
 
 def query(ts_id, summary):
+    tissue = []
+    panel = []
+    basic_info = ['', '', '', '']
     for i in iter(summary):
         if i['检测编号'] == ts_id:
-            return i['收样日期'], i['销售'], i['癌种'], i['其他']
-    return '', '', '', ''
+            tissue.append(i['组织类型'])
+            panel.append(i['检测项目'])
+            basic_info = [i['收样日期'], i['销售'], i['癌种'], i['其他']]
 
+    q_tissue = ''
+    if_blood = sum([i.__contains__('血') for i in tissue])
+    if_tissue = sum([i.__contains__('组织') for i in tissue]) + \
+                sum([i.__contains__('蜡') for i in tissue]) + \
+                sum([i.__contains__('切片') for i in tissue])
+    if if_blood:
+        if if_tissue:
+            q_tissue = 'T+B'
+        else:
+            q_tissue = 'B'
+    else:
+        if if_tissue:
+            q_tissue = 'T'
+        else:
+            q_tissue = 'UoN'
 
+    if sum([i.__contains__('PD-L1') for i in panel]) != 0:
+        q_pdl1 = True
+    else:
+        q_pdl1 = False
+
+    if ts_id.__contains__('ZXA'):
+        for i in iter(tissue):
+            if basic_info[3] == '':
+                basic_info[3] += i
+            else:
+                basic_info[3] += '\n' + i
+
+    return basic_info[0], basic_info[1], basic_info[2], basic_info[3], q_tissue, q_pdl1
+
+'''
 def query_sample_type(ts_id, summary):
     tissue = []
     for i in iter(summary):
@@ -145,8 +179,9 @@ def query_sample_type(ts_id, summary):
             return 'T'
         else:
             return 'UoN'
+'''
 
-
+'''
 def if_pdl1(ts_id, summary):
     panel = []
     for i in iter(summary):
@@ -156,6 +191,7 @@ def if_pdl1(ts_id, summary):
         return True
     else:
         return False
+'''
 
 
 def query_report(sales_name, dictionary):
@@ -203,24 +239,26 @@ if __name__ == '__main__':
     for i in iter(treatment):
         index += 1
         sample_id = i['TS编号']
-        if isinstance(sample_id, (int, float)):
-            sample_id = query_ts_id(str(int(sample_id)), summary_xlsx)
-        elif isinstance(sample_id, str):
-            sample_id = query_ts_id(sample_id, summary_xlsx)
         patient_name = i['患者姓名'].split('-')[0]
+
+        if isinstance(sample_id, (int, float)):
+            sample_id = query_ts_id(str(int(sample_id)), patient_name, summary_xlsx)
+        elif isinstance(sample_id, str):
+            sample_id = query_ts_id(sample_id, patient_name, summary_xlsx)
+        
         sample_name = i['样本名'].split('-')[0]
         test_panel = i['样本组成'] + i['文库名*'] + ',' + str(int(i['要求测序数据量（G）']))
         note_1 = i['备注']
         if not sample_id.__contains__('Not Found'):
-            receive_date, sales, cancer, note_2 = query(sample_id, summary_xlsx)
+            receive_date, sales, cancer, note_2, sample_type_raw, if_pdl1 = query(sample_id, summary_xlsx)
             report = query_report(sales, report_dict)
 
             sample_type = 'UoN'
             if test_panel.__contains__('小') or test_panel.__contains__('中'):
                 sample_type = 'B'
             elif test_panel.__contains__('肾癌'):
-                sample_type = query_sample_type(sample_id, summary_xlsx)
-            elif test_panel.__contains__('癌组织'):
+                sample_type = sample_type_raw
+            elif test_panel.__contains__('癌组织') or test_panel.__contains__('全外'):
                 for j in iter(control):
                     if j['患者姓名'].__contains__(patient_name):
                         if j['患者姓名'].__contains__('白细胞'):
@@ -232,15 +270,6 @@ if __name__ == '__main__':
                         break
                     else:
                         sample_type = '癌T'
-            elif test_panel.__contains__('全外'):
-                sample_type = query_sample_type(sample_id, summary_xlsx)
-                for j in iter(control):
-                    if j['患者姓名'].__contains__(patient_name):
-                        no_treatment.remove(j)
-                        test_panel += '.' + j['样本组成'] + j['文库名*'] + ',' + str(int(j['要求测序数据量（G）']))
-                        break
-                    else:
-                        sample_type = 'T'
             elif test_panel.__contains__('cfDNA'):
                 sample_type = 'B'
                 for j in iter(control):
@@ -249,7 +278,7 @@ if __name__ == '__main__':
                         test_panel += '.' + j['样本组成'] + j['文库名*'] + ',' + str(int(j['要求测序数据量（G）']))
                         break
 
-            if not if_pdl1(sample_id, summary_xlsx):
+            if not if_pdl1:
                 if note_1 == '':
                     note_1 = '不要pdl1'
                 else:
